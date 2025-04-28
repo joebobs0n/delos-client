@@ -6,7 +6,6 @@ sys.dont_write_bytecode = True
 from pathlib import Path
 import datetime, _io, argparse
 
-# from __init__ import __version__
 from utils import (
     Format, LogParent, Timer,
     SuppressPrintouts,
@@ -14,7 +13,8 @@ from utils import (
     # RedirectPrintouts,
 )
 
-import core
+from api import RestAPI
+import uvicorn
 
 class log(LogParent):
     @classmethod
@@ -44,20 +44,29 @@ class log(LogParent):
 
 
 def arg_defs() -> CliArgs:
-    args = CliArgs(
-        description = f"{Format.BOLD}{Format.DARK_GREEN}Delos Client Entrypoint{Format.END}",
-        args_width = 50,
-        total_width = 150,
-    )
+    cliargs = CliArgs(args_width = 50, total_width = 150)
+    cliargs.description = f"{Format.BOLD}{Format.DARK_GREEN}Delos Client Entrypoint{Format.END}"
+    cliargs.epilog = f""
 
-    return args
+    xor = cliargs.add_arg_group("XOR Arguments")
+    opt = xor.add_mutually_exclusive_group()
+    opt.add_argument("--foo", action="store_true", help="Foo option")
+    opt.add_argument("--bar", action="store_true", help="Bar option")
+
+    # args = cliargs.add_arg_group("Arguments")
+
+    flgs = cliargs.add_arg_group("Flags")
+    flgs.add_argument("-D", "--dev", action="store_true", help="Enable development mode")
+
+    return cliargs
 
 def main(*nargs, **kwargs) -> None:
-    with core.WireGuardManager() as wgm, core.RcloneManager() as rcm:
-        wgm.add(config="client", start=True);
-        rcm.add(remote_name="sgnas", mount_path=Path("/home/monka90/sg_nas"), mount=True)
-        input(f"{Format.DARK_BLUE}Check to see if mount is available. Press Enter to unmount and stop WireGuard.{Format.END}")
-    pass
+    uvicorn.run(
+        "api:RestAPI" if args.dev else RestAPI,
+        reload=True if args.dev else False,
+        host="127.0.0.1",
+        port=61413,
+    )
 
 if __name__ == "__main__":
     uniq = datetime.datetime.now().strftime("%m%d%y-%H%M%S")

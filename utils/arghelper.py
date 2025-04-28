@@ -89,6 +89,6 @@ class CliArgs:
     def add_arg_group(self, id: str) -> argparse._ArgumentGroup:
         if id not in self.__groups:
             display_name = f"{Format.UNDERLINE}{id}{Format.END}"
-            self.__groups[id] = (retval := self.__ap.add_argumement_group(display_name))
+            self.__groups[id] = (retval := self.__ap.add_argument_group(display_name))
             return retval
         return self.__groups[id]

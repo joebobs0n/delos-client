@@ -1,5 +1,5 @@
 import sys, _io
-import regex, shutil
+import regex, shutil, datetime
 
 
 class Format:
@@ -39,11 +39,12 @@ class LogParent:
         end = kwargs.get("end", "\n")
         pre = kwargs.get("pre", "")
         sname = kwargs.get("called_name", kwargs.get("scriptname", "_anon_"))
+        tstamp = f'{datetime.datetime.now().strftime("%m%d%y-%H%M%S")} | ' if kwargs.get("timestamp", False) else ""
 
         msg = kwargs.get("sep", " ").join([str(x) for x in nargs])
         msg = cls.__print_newlines(msg, stream=stream)
         msg = cls.__print_returns(msg, stream=stream)
-        msg = f"{pre} {Format.DARK_GRAY}[ {sname} ]{Format.END} {msg}"
+        msg = f"{pre} {Format.DARK_GRAY}[ {tstamp}{sname} ]{Format.END} {msg}"
 
         print("" if kwargs.get("plain", False) else msg, flush=flush, end=end, file=stream)
 

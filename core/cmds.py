@@ -38,7 +38,7 @@ class Rclone(OsCmds):
     @classmethod
     def mount(cls, name: str, path: str) -> str:
         return super()._return_cmd(
-            f"rclone mount {name} {path} --vfs-cache-mode writes"
+            f"rclone mount {name}: {path} --vfs-cache-mode writes"
         )
 
     @classmethod
