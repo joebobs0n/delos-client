@@ -357,67 +357,69 @@ function testVPN {
     info "\n${f_bold}${f_dark_blue}TESTING WIREGUARD${f_end}"
 
     info "${f_purple}add config w/o auto start${f_end}"
-    curl -X POST "localhost:${port}/vpn/add?config=client"; echo ''
-    curl -X GET  "localhost:${port}/vpn/status"; echo ''
+    curl -X POST "localhost:61413/vpn/add?config=client"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 
     info "${f_purple}start vpn${f_end}"
-    curl -X POST "localhost:${port}/vpn/start?config=client"; echo ''
-    curl -X GET  "localhost:${port}/vpn/status"; echo ''
+    curl -X POST "localhost:61413/vpn/start?config=client"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 
     info "${f_purple}stop vpn${f_end}"
-    curl -X POST "localhost:${port}/vpn/stop?config=client"; echo ''
-    curl -X GET  "localhost:${port}/vpn/status"; echo ''
+    curl -X POST "localhost:61413/vpn/stop?config=client"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 
     info "${f_purple}remove config after stop${f_end}"
-    curl -X POST "localhost:${port}/vpn/remove?config=client"; echo ''
-    curl -X GET  "localhost:${port}/vpn/status"; echo ''
+    curl -X POST "localhost:61413/vpn/remove?config=client"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 
     info "${f_purple}add config w/ auto start${f_end}"
-    curl -X POST "localhost:${port}/vpn/add?config=client&autostart=true"; echo ''
-    curl -X GET  "localhost:${port}/vpn/status"; echo ''
+    curl -X POST "localhost:61413/vpn/add?config=client&autostart=true"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 
     info "${f_purple}remove config w/o stop${f_end}"
-    curl -X POST "localhost:${port}/vpn/remove?config=client"; echo ''
-    curl -X GET  "localhost:${port}/vpn/status"; echo ''
+    curl -X POST "localhost:61413/vpn/remove?config=client"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 }
 
 function testRclone {
     info "\n${f_bold}${f_dark_blue}TESTING RCLONE${f_end}"
 
     info "${f_green}start server${f_end}"
-    curl -X POST "localhost:${port}/vpn/start?config=client"; echo ''
+    curl -X POST "localhost:61413/vpn/add?config=client&autostart=true"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 
     info "${f_purple}add remote w/o auto mount${f_end}"
-    curl -X POST "localhost:${port}/rclone/add?remote_name=sgnas&mount_path=/home/monka90/sg_nas"; echo ''
-    curl -X GET  "localhost:${port}/rclone/status"; echo ''
+    curl -X POST "localhost:61413/rclone/add?remote_name=sgnas&mount_path=$HOME/sg_nas"; echo ''
+    curl -X GET  "localhost:61413/rclone/status"; echo ''
+
+    # sleep 5
 
     info "${f_purple}mount remote${f_end}"
-    curl -X POST "localhost:${port}/rclone/mount?remote_name=sgnas"; echo ''
-    curl -X GET  "localhost:${port}/rclone/status"; echo ''
+    curl -X POST "localhost:61413/rclone/mount?remote_name=sgnas"; echo ''
+    curl -X GET  "localhost:61413/rclone/status"; echo ''
 
     info "${f_purple}unmount remote${f_end}"
-    curl -X POST "localhost:${port}/rclone/unmount?remote_name=sgnas"; echo ''
-    curl -X GET  "localhost:${port}/rclone/status"; echo ''
+    curl -X POST "localhost:61413/rclone/unmount?remote_name=sgnas"; echo ''
+    curl -X GET  "localhost:61413/rclone/status"; echo ''
 
     info "${f_purple}remove remote after unmount${f_end}"
-    curl -X POST "localhost:${port}/rclone/remove?remote_name=sgnas"; echo ''
-    curl -X GET  "localhost:${port}/rclone/status"; echo ''
+    curl -X POST "localhost:61413/rclone/remove?remote_name=sgnas"; echo ''
+    curl -X GET  "localhost:61413/rclone/status"; echo ''
 
     info "${f_purple}add remote w/ auto mount${f_end}"
-    curl -X POST "localhost:${port}/rclone/add?remote_name=sgnas&mount_path=/home/monka90/sg_nas&automount=true"; echo ''
-    curl -X GET  "localhost:${port}/rclone/status"; echo ''
+    curl -X POST "localhost:61413/rclone/add?remote_name=sgnas&mount_path=$HOME/sg_nas&automount=true"; echo ''
+    curl -X GET  "localhost:61413/rclone/status"; echo ''
 
     info "${f_purple}remove remote w/o unmount${f_end}"
-    curl -X POST "localhost:${port}/rclone/remove?remote_name=sgnas"; echo ''
-    curl -X GET  "localhost:${port}/rclone/status"; echo ''
+    curl -X POST "localhost:61413/rclone/remove?remote_name=sgnas"; echo ''
+    curl -X GET  "localhost:61413/rclone/status"; echo ''
 
     info "${f_green}stop server${f_end}"
-    curl -X POST "localhost:${port}/vpn/stop?config=client"; echo ''
+    curl -X POST "localhost:61413/vpn/remove?config=client"; echo ''
+    curl -X GET  "localhost:61413/vpn/status"; echo ''
 }
 
 function main {
-    port=61413
-
     testVPN
     testRclone
 }

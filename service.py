@@ -13,7 +13,7 @@ from utils import (
     # RedirectPrintouts,
 )
 
-from api import RestAPI
+from api import app
 import uvicorn
 
 class log(LogParent):
@@ -62,7 +62,7 @@ def arg_defs() -> CliArgs:
 
 def main(*nargs, **kwargs) -> None:
     uvicorn.run(
-        "api:RestAPI" if args.dev else RestAPI,
+        "api:app" if args.dev else app,
         reload=True if args.dev else False,
         host="127.0.0.1",
         port=61413,

@@ -10,49 +10,25 @@ class WireGuardManager:
         def __init__(self, config: str) -> None:
             self.config_name = config
 
-        def start(self) -> sp.CompletedProcess | None:
-            log.info("\n{}Starting{} WireGuard with config: {}{}{}".format(
-                Format.DARK_GREEN, Format.END,
-                Format.DARK_CYAN, self.config_name, Format.END
-            ), called_name="wireguard", timestamp=True)
-
+        def start(self) -> None:
             try:
-                start_process = sp.run(
+                sp.run(
                     WireGuardCmds.start(self.config_name),
                     shell=True, stdout=sp.PIPE, stderr=sp.STDOUT, check=True,
                 )
             except sp.CalledProcessError as e:
-                log.warning("Error starting WireGuard: {}{}{}".format(
-                    Format.RED, e, Format.END
-                ), called_name="wireguard")
-                return None
+                e.add_note(f"Error starting WireGuard [ {self.config_name} ]: {e.stdout.decode().strip()}")
+                raise e
 
-            log.info("WireGuard started {}successfully{}.".format(
-                Format.GREEN, Format.END
-            ), called_name="wireguard")
-            return start_process
-
-        def stop(self) -> sp.CompletedProcess | None:
-            log.info("\n{}Stopping{} WireGuard with config: {}{}{}".format(
-                Format.DARK_GREEN, Format.END,
-                Format.DARK_CYAN, self.config_name, Format.END
-            ), called_name="wireguard", timestamp=True)
-
+        def stop(self) -> None:
             try:
-                stop_process = sp.run(
+                sp.run(
                     WireGuardCmds.stop(self.config_name),
                     shell=True, stdout=sp.PIPE, stderr=sp.STDOUT, check=True,
                 )
             except sp.CalledProcessError as e:
-                log.warning("Error stopping WireGuard: {}{}{}".format(
-                    Format.RED, e, Format.END
-                ), called_name="wireguard")
-                return None
-
-            log.info("WireGuard stopped {}successfully{}.".format(
-                Format.GREEN, Format.END
-            ), called_name="wireguard")
-            return stop_process
+                e.add_note(f"Error stopping WireGuard [ {self.config_name} ]: {e.stdout.decode().strip()}")
+                raise e
 
         @property
         def status(self) -> str:
@@ -83,57 +59,38 @@ class WireGuardManager:
         return self.__instances.get(config, None)
 
     def __delitem__(self, config: str) -> None:
+        self.remove(config)
+
+    def add(self, config: str) -> None:
         if config in self.__instances.keys():
+            raise KeyError(f"WireGuard instance for {config} already exists")
+        self.__instances[config] = self._WireGuardInstance(config)
+
+    def start(self, config: str) -> None:
+        try:
+            self.__instances[config].start()
+        except KeyError as e:
+            e.add_note(f"WireGuard instance for {config} not found")
+            raise e
+
+    def stop(self, config: str) -> None:
+        try:
             self.__instances[config].stop()
-            del self.__instances[config]
-        else:
-            log.warning("WireGuard instance for {}{}{} not found.".format(
-                Format.YELLOW, config, Format.END
-            ), called_name="wireguard")
+        except KeyError as e:
+            e.add_note(f"WireGuard instance for {config} not found")
+            raise e
 
-    def add(self, config: str) -> _WireGuardInstance:
-        if config not in self.__instances.keys():
-            self.__instances[config] = self._WireGuardInstance(config)
-            return self.__instances[config]
-        else:
-            log.warning("WireGuard instance for {}{}{} already exists.".format(
-                Format.YELLOW, config, Format.END
-            ), called_name="wireguard")
-        return None
-
-    def start(self, config: str) -> sp.CompletedProcess | None:
-        if config in self.__instances.keys():
-            return self.__instances[config].start()
-        else:
-            log.warning("WireGuard instance for {}{}{} not found.".format(
-                Format.YELLOW, config, Format.END
-            ), called_name="wireguard")
-
-    def stop(self, config: str) -> bool:
-        if config in self.__instances.keys():
-            return (self.__instances[config].stop().returncode == 0)
-        else:
-            log.warning("WireGuard instance for {}{}{} not found.".format(
-                Format.YELLOW, config, Format.END
-            ), called_name="wireguard")
-        return False
-
-    def remove(self, config: str) -> bool:
-        if config in self.__instances.keys():
-            retval = True
+    def remove(self, config: str) -> None:
+        try:
             if self.__instances[config].status != "":
-                if (stop_proc := self.__instances[config].stop()) is not None:
-                    retval &= bool(stop_proc.returncode == 0)
+                self.__instances[config].stop()
             del self.__instances[config]
-            return retval
-        else:
-            log.warning("WireGuard instance for {}{}{} not found.".format(
-                Format.YELLOW, config, Format.END
-            ), called_name="wireguard")
-        return False
+        except KeyError as e:
+            e.add_note(f"WireGuard instance for {config} not found")
+            raise e
 
     @property
-    def status(self) -> list[str]:
+    def status(self) -> dict:
         return {
             config: {"started": bool(instance.status != "")}
             for config, instance in self.__instances.items()

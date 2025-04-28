@@ -2,6 +2,7 @@ import subprocess as sp
 from pathlib import Path
 from utils import Format, LogParent as log
 from core import RcloneCmds
+import time
 
 class RcloneManager:
     class _RcloneInstance:
@@ -10,45 +11,23 @@ class RcloneManager:
             self.__mount_path = mount_path
             self.__mount_proc = None
 
-        def mount(self) -> Path | None:
-            log.info("\n{}{}Mounting{} {}{}{} to {}{}{}".format(
-                Format.BOLD, Format.DARK_GREEN, Format.END,
-                Format.PURPLE, self.__remote_name, Format.END,
-                Format.DARK_CYAN, self.__mount_path, Format.END
-            ), called_name="rclone", timestamp=True)
-
+        def mount(self) -> None:
             try:
                 self.__mount_proc = sp.Popen(
                     RcloneCmds.mount(self.__remote_name, str(self.__mount_path)).split(),
                     stdout=sp.PIPE, stderr=sp.STDOUT
                 )
+                time.sleep(1)  # Give the proc time to start/settle
             except sp.CalledProcessError as e:
-                log.warning("Error mounting {}{}{}: {}{}{}".format(
-                    Format.PURPLE, self.__remote_name, Format.END,
-                    Format.RED, e, Format.END
-                ), called_name="rclone")
-                return None
-
-            log.info("Mounted {}{}{} to {}{}{} successfully.".format(
-                Format.PURPLE, self.__remote_name, Format.END,
-                Format.DARK_CYAN, self.__mount_path, Format.END
-            ), called_name="rclone")
-            return self.__mount_path
+                e.add_note(f"Error mounting [ {self.__remote_name} ]: {e.stdout.decode().strip()}")
+                raise e
 
         def __force_kill(self) -> None:
-            log.info("Process {}{}{} running. Attempting to kill.".format(
-                Format.UNDERLINE, self.__mount_proc.pid, Format.END
-            ), called_name="rclone")
-
             self.__mount_proc.kill()
             if self.__mount_proc.poll() is None:
                 raise TimeoutError(f"Process {self.__mount_proc.pid} failed to kill. Please kill it manually.")
 
         def __try_terminate(self) -> None:
-            log.info("Process {}{}{} running. Attempting to terminate.".format(
-                Format.UNDERLINE, self.__mount_proc.pid, Format.END
-            ), called_name="rclone")
-
             self.__mount_proc.terminate()
             try:
                 self.__mount_proc.wait(timeout=5)
@@ -59,37 +38,23 @@ class RcloneManager:
             if self.__mount_proc is not None:
                 if self.__mount_proc.poll() is None:
                     self.__try_terminate()
-                else:
-                    log.info("Process {}{}{} is dead.".format(
-                        Format.UNDERLINE, self.__mount_proc.pid, Format.END
-                    ), called_name="rclone")
 
-        def unmount(self) -> bool:
-            log.info("\n{}{}Unmounting{} {}{}{} from {}{}{}".format(
-                Format.BOLD, Format.DARK_GREEN, Format.END,
-                Format.PURPLE, self.__remote_name, Format.END,
-                Format.DARK_CYAN, self.__mount_path, Format.END
-            ), called_name="rclone", timestamp=True)
-
-            unmount_proc = sp.run(
-                RcloneCmds.unmount(self.__mount_path),
-                shell=True, stdout=sp.PIPE, stderr=sp.STDOUT
-            )
-            self.__ensure_stopped()
-            self.__mount_proc = None
-
-            if unmount_proc.returncode == 0:
-                log.info("Unmounted {}{}{} from {}{}{} successfully.".format(
-                    Format.PURPLE, self.__remote_name, Format.END,
-                    Format.DARK_CYAN, self.__mount_path, Format.END
-                ), called_name="rclone")
-                return True
-            else:
-                log.warning("Error unmounting {}{}{}: {}{}{}".format(
-                    Format.PURPLE, self.__remote_name, Format.END,
-                    Format.RED, unmount_proc.stdout.decode().strip(), Format.END
-                ), called_name="rclone")
-            return False
+        def unmount(self) -> None:
+            try:
+                if self.mounted:
+                    sp.run(
+                        RcloneCmds.unmount(self.__mount_path),
+                        shell=True, stdout=sp.PIPE, stderr=sp.STDOUT, check=True
+                    )
+                    self.__ensure_stopped()
+                    self.__mount_proc = None
+            except sp.CalledProcessError as e:
+                print()
+                e.add_note(f"Error unmounting [ {self.__remote_name} ]: {e.stdout.decode().strip()}")
+                raise e
+            except TimeoutError as e:
+                e.add_note(f"Unable to kill process [ {self.__mount_proc.pid} ]: {e.stdout.decode().strip()}")
+                raise e
 
         @property
         def remote_name(self) -> str:
@@ -105,7 +70,6 @@ class RcloneManager:
                 return False
             return True
 
-    #! --------------------------------------------------------------------------------------------
 
     def __init__(self) -> None:
         log.info("{}Starting Rclone Manager{}".format(
@@ -127,53 +91,40 @@ class RcloneManager:
     def __delitem__(self, remote_name: str) -> None:
         self.remove(remote_name)
 
-    def add(self, remote_name: str, mount_path: Path = None) -> _RcloneInstance | None:
-        if remote_name not in self.__instances.keys():
-            self.__instances[remote_name] = self._RcloneInstance(remote_name, mount_path)
-            return self.__instances[remote_name]
-        else:
-            log.warning("Rclone instance for {}{}{} already exists.".format(
-                Format.YELLOW, remote_name, Format.END
-            ), called_name="rclone")
-        return None
+    def add(self, remote_name: str, mount_path: Path = None) -> None:
+        if remote_name in self.__instances.keys():
+            raise KeyError(f"Rclone instance for {remote_name} already exists")
+        self.__instances[remote_name] = self._RcloneInstance(remote_name, mount_path)
 
     def mount(self, remote_name: str) -> Path | None:
-        if remote_name in self.__instances.keys():
-            return self.__instances[remote_name].mount()
-        else:
-            log.warning("Rclone instance for {}{}{} not found.".format(
-                Format.YELLOW, remote_name, Format.END
-            ), called_name="rclone")
+        try:
+            self.__instances[remote_name].mount()
+        except KeyError as e:
+            e.add_note(f"Rclone instance for {remote_name} not found")
+            raise e
 
     def unmount(self, remote_name: str) -> bool:
-        if remote_name in self.__instances.keys():
-            return self.__instances[remote_name].unmount()
-        else:
-            log.warning("Rclone instance for {}{}{} not found.".format(
-                Format.YELLOW, remote_name, Format.END
-            ), called_name="rclone")
-        return False
+        try:
+            self.__instances[remote_name].unmount()
+        except KeyError as e:
+            e.add_note(f"Rclone instance for {remote_name} not found")
+            raise e
 
     def remove(self, remote_name: str) -> bool:
-        if remote_name in self.__instances.keys():
-            retval = True
-            if self.__instances[remote_name].mounted:
-                retval &= self.__instances[remote_name].unmount()
+        try:
+            self.__instances[remote_name].unmount()
             del self.__instances[remote_name]
-            return retval
-        else:
-            log.warning("Rclone instance for {}{}{} not found.".format(
-                Format.YELLOW, remote_name, Format.END
-            ), called_name="rclone")
-        return False
+        except KeyError as e:
+            e.add_note(f"Rclone instance for {remote_name} not found")
+            raise e
 
     @property
     def remotes(self) -> list[str]:
         return list(self.__instances.keys())
 
     @property
-    def status(self) -> list[tuple[str, Path]]:
+    def status(self) -> dict:
         return {
-            remote_name: {"mount_path": instance.mount_path, "mounted": instance.mounted}
+            remote_name: {"mounted": instance.mounted, "mount_path": instance.mount_path}
             for remote_name, instance in self.__instances.items()
         }
