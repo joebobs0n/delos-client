@@ -65,7 +65,7 @@ def main(*nargs, **kwargs) -> None:
         "api:app" if args.dev else app,
         reload=True if args.dev else False,
         host="127.0.0.1",
-        port=61413,
+        port=8001,
     )
 
 if __name__ == "__main__":
